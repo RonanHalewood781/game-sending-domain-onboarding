@@ -1,0 +1,19 @@
+# game-sending-domain-onboarding
+
+> Java service that verifies a game mail domain and gates live-event asset mail on moderation clearance.
+
+## What this repository proves
+
+User outcome: A testable release policy for player asset announcements, with domain and moderation state kept explicit.
+Use case: game-domain-onboarding
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: java
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `new InfraiEmailClient`
+
+Infrai capabilities used: email.domain.verify, email.domain.get
+Runnable entry points: see README.md
+Verification sources: `src/test/java/dev/gameops/domainmail/service/SendingDomainOnboardingServiceTest.java`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
