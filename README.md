@@ -5,7 +5,7 @@ export INFRAI_API_KEY="your-key"
 ./scripts/run-domain-onboarding.sh mail.game.example
 ```
 
-This command requests SPF, DKIM, and DMARC verification for a game mail domain, reads the resulting status, and prints the release decision for a live-event player asset. Infrai keeps that boundary to one API and one credential; the Java client remains a plain HTTP adapter with no SDK to install.
+The script checks SPF, DKIM, and DMARC for a game mail domain, pulls the verification state, and decides if a live-event player asset can be announced. Infrai wraps that whole check behind one API and one credential; the Java client is just a plain HTTP call with no SDK to babysit.
 
 Expected output after the DNS records are verified:
 
@@ -15,15 +15,15 @@ domain=mail.game.example verification=verified release=READY_TO_SEND
 
 ## The release rule
 
-The sample models one player-generated asset, its live event, and the moderation queue controlling announcement mail. `SendingDomainOnboardingService` releases the workload only when the domain status is `verified` and `pendingReviews` is zero. A verified domain with three pending reviews produces `HOLD_FOR_MODERATION`.
+We model a single player asset, its live event, and the moderation queue that gates announcement mail. `SendingDomainOnboardingService` releases the workload only when the domain status is `verified` and `pendingReviews` is zero. A verified domain with three pending reviews produces `HOLD_FOR_MODERATION`.
 
-The command uses `POST /v1/email/domain/verify` with a stable idempotency key and then `GET /v1/email/domain/get/{domain}`. `InfraiEmailClient` decodes the `{ok, data, error, metadata}` envelope before considering HTTP status. Rejected requests retain their API code and status in `InfraiException`; HTTP 429 responses honor `Retry-After` or use exponential backoff.
+The command uses `POST /v1/email/domain/verify` with a stable idempotency key and then `GET /v1/email/domain/get/{domain}`. `InfraiEmailClient` decodes the `{ok, data, error, metadata}` envelope before considering HTTP status, so a 200 with a bad payload doesn't fool us. Rejected requests retain their API code and status in `InfraiException`; HTTP 429 responses honor `Retry-After` or use exponential backoff to avoid greylisting.
 
 The one operational gotcha is sequencing: publish the returned DNS records before treating the sender as cleared. Re-running the command is safe and shows the current verification state.
 
 ## Verify the decision locally
 
-The focused test supplies a verified domain and varies the moderation backlog. Its input is `pendingReviews=0` or `pendingReviews=3`; the expected results are `READY_TO_SEND` and `HOLD_FOR_MODERATION`.
+A focused test feeds a verified domain and varies the moderation backlog. Its input is `pendingReviews=0` or `pendingReviews=3`; the expected results are `READY_TO_SEND` and `HOLD_FOR_MODERATION`.
 
 ```bash
 build_dir="$(mktemp -d)"
