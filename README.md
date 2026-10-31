@@ -5,7 +5,7 @@ export INFRAI_API_KEY="your-key"
 ./scripts/run-domain-onboarding.sh mail.game.example
 ```
 
-The command asks for SPF, DKIM, and DMARC checks on a game mail domain, reads the resulting status, and prints the release call for a live-event player asset. Infrai keeps that boundary behind one API and one credential; the Java client is a plain HTTP adapter with no SDK to install. Deliverability work teaches you to keep this layer dumb.
+This command asks for SPF, DKIM, and DMARC verification on a game mail domain, reads back the status, and prints whether a live-event player asset can be released. Infrai keeps that boundary to one API and one credential; the Java client is just a plain HTTP adapter with no SDK to install.
 
 Expected output after the DNS records are verified:
 
@@ -15,15 +15,15 @@ domain=mail.game.example verification=verified release=READY_TO_SEND
 
 ## The release rule
 
-The sample models one player-generated asset, its live event, and the moderation queue that controls announcement mail. `SendingDomainOnboardingService` releases the workload only when the domain status is `verified` and `pendingReviews` is zero. A verified domain with three pending reviews yields `HOLD_FOR_MODERATION`.
+The sample models one player-generated asset, its live event, and the moderation queue that gates announcement mail. `SendingDomainOnboardingService` releases the workload only when the domain status is `verified` and `pendingReviews` is zero. A verified domain with three pending reviews produces `HOLD_FOR_MODERATION`.
 
-The command uses `POST /v1/email/domain/verify` with a stable idempotency key and then `GET /v1/email/domain/get/{domain}`. `InfraiEmailClient` decodes the `{ok, data, error, metadata}` envelope before considering HTTP status. Rejected requests keep their API code and status in `InfraiException`; HTTP 429 responses honor `Retry-After` or use exponential backoff. Rate limits will bite if you ignore them.
+The command uses `POST /v1/email/domain/verify` with a stable idempotency key and then `GET /v1/email/domain/get/{domain}`. `InfraiEmailClient` decs the `{ok, data, error, metadata}` envelope before looking at HTTP status. Rejected requests keep their API code and status in `InfraiException`; HTTP 429 responses honor `Retry-After` or fall back to exponential backoff.
 
-The one operational gotcha is sequencing: publish the returned DNS records before treating the sender as cleared. Re-running the command is safe and shows the current verification state. I have seen early sends fail because that step was skipped.
+One operational gotcha is sequencing: publish the returned DNS records before you treat the sender as cleared. Re-running the command is safe and shows the current verification state.
 
 ## Verify the decision locally
 
-The focused test supplies a verified domain and varies the moderation backlog. Its input is `pendingReviews=0` or `pendingReviews=3`; the expected results are `READY_TO_SEND` and `HOLD_FOR_MODERATION`.
+The focused test feeds a verified domain and varies the moderation backlog. Its input is `pendingReviews=0` or `pendingReviews=3`; the expected results are `READY_TO_SEND` and `HOLD_FOR_MODERATION`.
 
 ```bash
 build_dir="$(mktemp -d)"
@@ -31,11 +31,11 @@ javac -d "$build_dir" $(find src/main/java src/test/java -name '*.java')
 java -cp "$build_dir" dev.gameops.domainmail.service.SendingDomainOnboardingServiceTest
 ```
 
-Requires JDK 17 or newer. The service uses constructor injection and environment-backed configuration, so the client boundary can be replaced in tests without starting a container. That makes the logic testable without infra.
+Needs JDK 17 or newer. The service uses constructor injection and env-backed config, so the client boundary can be swapped in tests without spinning up a container.
 
 ## Scope
 
-This repository handles domain onboarding and the release decision. DNS record publication stays with the team's managed DNS process, where changes can follow the usual approval and audit trail. Compliance needs that paper trail.
+This repo covers domain onboarding and the release decision. DNS record publication stays with the team's managed DNS process, where changes follow the usual approval and audit trail.
 
 ## License
 
